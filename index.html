@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Play Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#E4EDF7; --surface:#FFFFFF; --ink:#1B2740; --muted:#55657F; --line:#C3D1E3; --focus:#2A74D8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#121A28; --surface:#1E293D; --ink:#EEF3FB; --muted:#A4B2C9; --line:#36455F; --focus:#6FA8F5;
+  }
+  :root:not([data-theme="light"]) .zone{background:var(--tint-d)}
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#121A28; --surface:#1E293D; --ink:#EEF3FB; --muted:#A4B2C9; --line:#36455F; --focus:#6FA8F5;
+}
+:root[data-theme="dark"] .zone{background:var(--tint-d)}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  height:100%;margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Lexend','Trebuchet MS','Segoe UI',system-ui,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden;
+  user-select:none;-webkit-user-select:none;
+}
+
+/* Top bar */
+.top{display:flex;align-items:center;gap:1vw;padding:1.4vh 2vw .6vh;flex-wrap:wrap}
+h1{margin:0;font-size:clamp(1.8rem,3.6vw,3.4rem);font-weight:800;letter-spacing:-.02em;line-height:1}
+.date{margin:.25em 0 0;font-size:clamp(1rem,1.5vw,1.5rem);color:var(--muted);font-weight:600}
+.pills{margin-left:auto;display:flex;gap:.8vw;flex-wrap:wrap}
+.pill{font-size:clamp(.95rem,1.5vw,1.5rem);font-weight:700;background:var(--surface);
+  border-radius:999px;padding:.4em 1em;border:2px solid var(--line);white-space:nowrap}
+.gear{font-size:clamp(1.1rem,1.8vw,1.7rem);background:transparent;border:2px solid var(--line);color:var(--ink);
+  border-radius:12px;width:2.4em;height:2.4em;cursor:pointer;flex:none}
+
+main{flex:1;min-height:0;display:flex;flex-direction:column;gap:1.4vh;padding:.8vh 2vw 1.8vh}
+
+/* Name pool */
+.pool{flex:0 0 36%;min-height:0;display:flex;flex-direction:column;background:var(--surface);
+  border-radius:22px;padding:1.2vh 1.2vw;border:3px dashed var(--line);transition:border-color .15s}
+.pool.over{border-color:var(--ink)}
+.pool-head{display:flex;align-items:center;gap:1vw;margin:0 0 1vh;flex-wrap:wrap}
+.pool h2{margin:0;font-size:clamp(1.1rem,2vw,2rem);font-weight:700}
+.hint{font:inherit;font-weight:600;font-size:clamp(.8rem,1.1vw,1.1rem);background:var(--bg);color:var(--ink);
+  border:2px solid var(--ink);border-radius:999px;padding:.3em .9em;cursor:pointer}
+.tags{flex:1;min-height:0;overflow:hidden;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(7.5em,1fr));
+  gap:.4em;align-content:start;padding:4px 4px 8px;font-size:28px}
+.done{grid-column:1/-1;display:grid;place-items:center;min-height:100%;padding:2vh;text-align:center;
+  font-size:clamp(1.3rem,2.6vw,2.6rem);font-weight:700;color:var(--muted)}
+
+/* Name tags */
+.tag{position:relative;display:flex;align-items:center;gap:.4em;background:var(--surface);color:var(--ink);
+  border:3px solid var(--ink);border-radius:14px;padding:.45em .55em;font-weight:700;
+  font-size:1em;line-height:1.1;cursor:grab;touch-action:none;box-shadow:0 4px 0 var(--ink)}
+.tag::before{content:"";flex:none;width:.5em;height:.5em;border-radius:50%;border:3px solid var(--ink);background:var(--bg)}
+.tag .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.badge{flex:none;margin-left:auto;font-size:.78em;line-height:1;border-radius:999px;padding:.2em .35em;font-weight:800}
+.badge.none{border:2px dashed var(--muted);color:var(--muted);padding:.1em .45em}
+.tag.lifting{opacity:.2}
+.ghost{position:fixed;left:0;top:0;z-index:100;pointer-events:none;cursor:grabbing;margin:0;
+  box-shadow:0 4px 0 var(--ink),0 16px 28px rgba(15,25,45,.32)}
+
+/* Play club zones (colors come from settings) */
+.zones{flex:1;min-height:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:clamp(8px,.9vw,14px)}
+.zone{display:flex;flex-direction:column;min-height:0;border-radius:22px;background:var(--tint-l);
+  border:4px solid var(--c);overflow:hidden;transition:transform .15s,box-shadow .15s}
+.zone-head{background:var(--c);color:var(--on);padding:1.1vh .7vw;display:flex;align-items:center;gap:.35em;
+  font-weight:800;font-size:clamp(.95rem,1.6vw,1.8rem);line-height:1.05}
+.zone-head .icon{font-size:1.3em;line-height:1}
+.zone-head .label{flex:1;min-width:0;overflow-wrap:anywhere}
+.zone-head .count{background:#FFFFFF;color:#1B2740;border-radius:999px;min-width:1.8em;text-align:center;
+  padding:.1em .45em;font-size:.85em}
+.list{flex:1;min-height:0;overflow:hidden;padding:1vh .5vw 1.4vh;display:flex;flex-wrap:wrap;align-content:flex-start;gap:.35em;font-size:20px}
+.zone .tag{font-size:1em;max-width:100%;border-width:2px;border-radius:10px;padding:.3em .45em;box-shadow:0 3px 0 var(--ink)}
+.zone .tag::before{border-width:2px}
+.zone.over{transform:scale(1.03);box-shadow:0 0 0 6px var(--c)}
+.zone.landed{animation:bump .35s ease-out}
+@keyframes bump{40%{transform:scale(1.05)}}
+
+/* Lunch question bubble */
+.ask{position:fixed;left:0;top:0;z-index:90;width:clamp(280px,24vw,420px);background:var(--surface);color:var(--ink);
+  border:4px solid var(--ink);border-radius:22px;padding:1.1em 1.1em 1.2em;box-shadow:0 6px 0 var(--ink),0 18px 34px rgba(15,25,45,.3);
+  font-size:clamp(16px,1.3vw,22px);animation:pop .18s ease-out}
+@keyframes pop{from{transform:scale(.9);opacity:0}}
+.ask-name{font-weight:800;font-size:1.5em;line-height:1.1;padding-right:1.6em;overflow-wrap:anywhere}
+.ask-q{font-weight:600;color:var(--muted);margin:.15em 0 .8em}
+.ask-btns{display:grid;grid-template-columns:1fr 1fr;gap:.6em}
+.lb{font:inherit;font-weight:800;font-size:1.1em;border:none;border-radius:16px;padding:.7em .4em;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:.25em;touch-action:manipulation;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.lb .e{font-size:1.8em;line-height:1}
+.lb.picked{outline:4px solid var(--ink);outline-offset:3px}
+.ask-x{position:absolute;top:.5em;right:.5em;width:2em;height:2em;border-radius:50%;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:1.1em;font-weight:700;cursor:pointer;line-height:1}
+
+/* Teacher settings */
+dialog{border:none;border-radius:22px;padding:0;width:min(680px,94vw);max-height:92vh;overflow-y:auto;
+  background:var(--surface);color:var(--ink);font-family:inherit}
+dialog::backdrop{background:rgba(10,15,25,.4)}
+.sheet-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:18px 24px;
+  background:var(--surface);border-bottom:2px solid var(--line)}
+.sheet-top h3{margin:0;font-size:1.5rem;font-weight:800;flex:1}
+.sheet{padding:8px 24px 28px;display:flex;flex-direction:column}
+.sheet section{padding:18px 0;border-bottom:2px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.sheet section:last-child{border-bottom:none}
+.sheet h4{margin:0;font-size:1.15rem;font-weight:800}
+.sheet p{margin:0;color:var(--muted);font-size:.95rem;line-height:1.45}
+.lunch-list{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:12px;padding:12px 14px;
+  user-select:text;-webkit-user-select:text}
+.lunch-list div{line-height:1.45}
+.lunch-list b{display:inline-block;min-width:8.5em}
+.edit-list{display:flex;flex-direction:column;gap:8px}
+.edit-row{display:grid;grid-template-columns:3.2em 3.4em minmax(0,1fr) auto;gap:8px;align-items:center}
+.edit-row.lunch-row{grid-template-columns:3.2em 3.4em minmax(0,1fr)}
+.edit-row .acts{display:flex;gap:4px}
+input[type=color]{width:100%;height:2.7em;border:2px solid var(--line);border-radius:10px;padding:2px;background:var(--surface);cursor:pointer}
+input[type=text],textarea{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);border:2px solid var(--line);
+  border-radius:10px;padding:.55em .7em;width:100%;user-select:text;-webkit-user-select:text}
+input.icon-in{text-align:center;font-size:1.3rem;padding:.3em}
+textarea{height:28vh;line-height:1.5;resize:vertical}
+.mini{font:inherit;font-weight:700;width:2.4em;height:2.4em;border-radius:10px;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer}
+.mini:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.check{display:flex;gap:10px;align-items:center;font-weight:600}
+.check input{width:1.3em;height:1.3em;flex:none}
+.btn{font:inherit;font-weight:700;padding:.6em 1.1em;border-radius:12px;border:2px solid var(--ink);
+  background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--ink);color:var(--surface)}
+.btn.quiet{border-color:var(--line)}
+.btn:disabled{opacity:.4;cursor:default}
+.spacer{flex:1}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+
+@media (max-width:760px){
+  body{overflow:auto}
+  main{flex:none}
+  .pool{flex:none;max-height:45vh}
+  .zones{flex:none;grid-template-columns:1fr 1fr !important}
+  .zone{min-height:180px}
+}
+@media (prefers-reduced-motion: reduce){
+  .zone,.pool{transition:none}
+  .zone.landed,.ask{animation:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1 id="boardTitle">Play Club</h1>
+    <p class="date" id="date"></p>
+  </div>
+  <div class="pills">
+    <div class="pill" id="progress"></div>
+    <div class="pill" id="hotCount"></div>
+    <div class="pill" id="coldCount"></div>
+  </div>
+  <button class="gear" id="gear" aria-label="Teacher settings" title="Teacher settings">⚙️</button>
+</header>
+
+<main>
+  <section class="pool" data-drop="pool" aria-label="Names not sorted yet">
+    <div class="pool-head">
+      <h2 id="prompt"></h2>
+      <button class="hint" id="hint" hidden>These are sample names. Add your class ⚙️</button>
+    </div>
+    <div class="tags" id="pool"></div>
+  </section>
+  <section class="zones" id="zones" aria-label="Play clubs"></section>
+</main>
+
+<dialog id="settings" aria-labelledby="settingsTitle">
+  <div class="sheet-top">
+    <h3 id="settingsTitle">Teacher settings</h3>
+    <button class="btn primary" id="closeSettings">Done</button>
+  </div>
+  <div class="sheet">
+    <section id="lunchSummary">
+      <h4>Today’s lunch</h4>
+      <div class="lunch-list" id="lunchList"></div>
+    </section>
+
+    <section>
+      <h4>Play clubs</h4>
+      <p>Tap a color square to pick a new color. Changes show on the board right away.</p>
+      <div class="edit-list" id="clubEditor"></div>
+      <div class="row">
+        <button class="btn" id="addClub">Add a play club</button>
+        <span class="spacer"></span>
+        <button class="btn quiet" id="resetClubs">Restore default clubs</button>
+      </div>
+    </section>
+
+    <section>
+      <h4>Lunch choice</h4>
+      <label class="check"><input type="checkbox" id="askLunch"> Ask students to pick their lunch after they sign in</label>
+      <div class="edit-list" id="lunchEditor"></div>
+    </section>
+
+    <section>
+      <h4><label for="titleInput">Board title</label></h4>
+      <input type="text" id="titleInput" maxlength="40">
+    </section>
+
+    <section>
+      <h4><label for="roster">Class list</label></h4>
+      <p>Type or paste one name per line. Names and settings are saved only in this computer’s browser.</p>
+      <textarea id="roster" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn quiet" id="sortAZ">Sort A–Z</button>
+        <span class="spacer"></span>
+        <button class="btn primary" id="saveRoster">Save class list</button>
+      </div>
+    </section>
+
+    <section>
+      <h4>Each day</h4>
+      <label class="check"><input type="checkbox" id="fresh"> Start fresh each morning (play clubs and lunch choices clear automatically)</label>
+      <div class="row"><button class="btn" id="resetAll">Clear today’s choices now</button></div>
+    </section>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  var DEFAULT_CLUBS = [
+    {id:'kpod',  name:'K Pod',        icon:'🧸', color:'#F2B705'},
+    {id:'first', name:'1st Grade',    icon:'🖍️', color:'#E24C86'},
+    {id:'third', name:'3rd Grade',    icon:'🧩', color:'#7556D6'},
+    {id:'lunch', name:'Lunchroom',    icon:'🍎', color:'#14937F'},
+    {id:'mile',  name:'Mileage Club', icon:'👟', color:'#2A74D8'},
+    {id:'lib',   name:'Library',      icon:'📚', color:'#F28C28'}
+  ];
+  var DEFAULT_LUNCH = {
+    hot:  {label:'Hot lunch',  icon:'🍽️', color:'#E0484D'},
+    cold: {label:'Cold lunch', icon:'🥪', color:'#1B9AD1'}
+  };
+  var SAMPLE = ['Ava','Ben','Carter','Delilah','Eli','Finn','Grace','Harper','Isaac','Jade','Kai',
+                'Lily','Mason','Nora','Owen','Piper','Quinn','Reid','Sophie','Theo','Violet','Wyatt'];
+  var KEY = 'playclub-sort-v1';
+  var TAP_DISTANCE = 10;
+  var MAX_CLUBS = 8;
+
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+  function todayKey(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function isHex(c){ return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c); }
+
+  // ---- Load saved state ----
+  var state = {
+    roster:SAMPLE.slice(), places:{}, lunch:{}, day:todayKey(), fresh:true, isSample:true,
+    clubs:clone(DEFAULT_CLUBS), lunchOpts:clone(DEFAULT_LUNCH), askLunch:true, title:'Play Club'
+  };
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s && Array.isArray(s.roster)) {
+        state.roster = s.roster;
+        state.places = (s.places && typeof s.places === 'object') ? s.places : {};
+        state.lunch = (s.lunch && typeof s.lunch === 'object') ? s.lunch : {};
+        state.day = s.day || todayKey();
+        state.fresh = s.fresh !== false;
+        state.isSample = !!s.isSample;
+        if (Array.isArray(s.clubs) && s.clubs.length) {
+          state.clubs = s.clubs.filter(function(c){ return c && c.id && isHex(c.color); });
+          if (!state.clubs.length) state.clubs = clone(DEFAULT_CLUBS);
+        }
+        if (s.lunchOpts && s.lunchOpts.hot && s.lunchOpts.cold) state.lunchOpts = s.lunchOpts;
+        if (typeof s.askLunch === 'boolean') state.askLunch = s.askLunch;
+        if (typeof s.title === 'string') state.title = s.title;
+      }
+    }
+  } catch (e) {}
+
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---- Color helpers ----
+  function rgb(hex){
+    var n = parseInt(String(hex).slice(1), 16);
+    return isNaN(n) ? {r:128,g:128,b:128} : {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+  }
+  function mix(hex, withHex, amt){
+    var a = rgb(hex), b = rgb(withHex);
+    function c(x, y){ return Math.round(x * (1 - amt) + y * amt); }
+    return 'rgb(' + c(a.r,b.r) + ',' + c(a.g,b.g) + ',' + c(a.b,b.b) + ')';
+  }
+  function textOn(hex){
+    var c = rgb(hex);
+    function ch(v){ v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    var L = 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+    return L > 0.22 ? '#1B2740' : '#FFFFFF';
+  }
+
+  // ---- Board elements ----
+  var zonesEl = document.getElementById('zones');
+  var zoneEls = {};
+  var poolEl = document.getElementById('pool');
+  var progressEl = document.getElementById('progress');
+  var hotEl = document.getElementById('hotCount');
+  var coldEl = document.getElementById('coldCount');
+  var dateEl = document.getElementById('date');
+  var hintEl = document.getElementById('hint');
+  var titleEl = document.getElementById('boardTitle');
+  var promptEl = document.getElementById('prompt');
+  var drags = new Map();
+  var pending = new Map();
+  var asks = {};
+
+  function clubById(id){
+    for (var i = 0; i < state.clubs.length; i++) if (state.clubs[i].id === id) return state.clubs[i];
+    return null;
+  }
+
+  function buildZones(){
+    zonesEl.innerHTML = '';
+    zoneEls = {};
+    zonesEl.style.gridTemplateColumns = 'repeat(' + state.clubs.length + ',minmax(0,1fr))';
+    state.clubs.forEach(function(z){
+      var root = document.createElement('div');
+      root.className = 'zone';
+      root.dataset.drop = z.id;
+      root.setAttribute('aria-label', z.name || 'Play club');
+      root.style.setProperty('--c', z.color);
+      root.style.setProperty('--on', textOn(z.color));
+      root.style.setProperty('--tint-l', mix(z.color, '#FFFFFF', 0.82));
+      root.style.setProperty('--tint-d', mix(z.color, '#1E293D', 0.72));
+      var head = document.createElement('div');
+      head.className = 'zone-head';
+      var ic = document.createElement('span'); ic.className = 'icon'; ic.setAttribute('aria-hidden','true'); ic.textContent = z.icon || '';
+      var lb = document.createElement('span'); lb.className = 'label'; lb.textContent = z.name || 'Play club';
+      var ct = document.createElement('span'); ct.className = 'count'; ct.textContent = '0';
+      head.appendChild(ic); head.appendChild(lb); head.appendChild(ct);
+      var list = document.createElement('div');
+      list.className = 'list';
+      root.appendChild(head); root.appendChild(list);
+      zonesEl.appendChild(root);
+      zoneEls[z.id] = {root:root, list:list, count:ct};
+    });
+  }
+
+  function isDragging(name){
+    var found = false;
+    drags.forEach(function(d){ if (d.name === name) found = true; });
+    return found;
+  }
+
+  function makeTag(name, inZone){
+    var el = document.createElement('div');
+    el.className = 'tag';
+    el.dataset.name = name;
+    var sp = document.createElement('span');
+    sp.className = 'nm';
+    sp.textContent = name;
+    el.appendChild(sp);
+    if (state.askLunch) {
+      var l = state.lunch[name];
+      var opt = l && state.lunchOpts[l];
+      if (opt) {
+        var b = document.createElement('span');
+        b.className = 'badge';
+        b.style.background = opt.color;
+        b.textContent = opt.icon || opt.label.charAt(0);
+        b.title = opt.label;
+        el.appendChild(b);
+      } else if (inZone) {
+        var q = document.createElement('span');
+        q.className = 'badge none';
+        q.textContent = '?';
+        q.title = 'Lunch not picked yet';
+        el.appendChild(q);
+      }
+    }
+    if (isDragging(name)) el.classList.add('lifting');
+    el.addEventListener('pointerdown', onDown);
+    return el;
+  }
+
+  function render(){
+    dateEl.textContent = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+    titleEl.textContent = state.title || 'Play Club';
+    document.title = state.title || 'Play Club';
+    promptEl.textContent = state.askLunch
+      ? 'Drag your name to your play club, then pick your lunch'
+      : 'Drag your name to where you’re playing today';
+    hintEl.hidden = !state.isSample;
+
+    poolEl.innerHTML = '';
+    var waiting = state.roster.filter(function(n){ return !clubById(state.places[n]); });
+    waiting.forEach(function(n){ poolEl.appendChild(makeTag(n, false)); });
+    if (!waiting.length) {
+      var d = document.createElement('div');
+      d.className = 'done';
+      d.textContent = state.roster.length ? 'Everyone’s picked a play club! 🎉' : 'Add your class list in ⚙️ settings';
+      poolEl.appendChild(d);
+    }
+
+    var picked = 0;
+    state.clubs.forEach(function(z){
+      var names = state.roster.filter(function(n){ return state.places[n] === z.id; })
+                              .sort(function(a,b){ return a.localeCompare(b); });
+      picked += names.length;
+      var zl = zoneEls[z.id];
+      zl.list.innerHTML = '';
+      names.forEach(function(n){ zl.list.appendChild(makeTag(n, true)); });
+      zl.count.textContent = names.length;
+    });
+
+    progressEl.textContent = picked + ' of ' + state.roster.length + ' picked';
+    var counts = {hot:0, cold:0};
+    state.roster.forEach(function(n){ if (counts[state.lunch[n]] !== undefined) counts[state.lunch[n]]++; });
+    [['hot', hotEl], ['cold', coldEl]].forEach(function(p){
+      var o = state.lunchOpts[p[0]];
+      p[1].hidden = !state.askLunch;
+      p[1].textContent = (o.icon ? o.icon + ' ' : '') + o.label + ' ' + counts[p[0]];
+      p[1].style.borderColor = o.color;
+    });
+    fitAll();
+  }
+
+  // ---- Auto-size names so every tag is visible with no scrolling ----
+  function fitBox(box, maxPx, minPx){
+    box.style.fontSize = maxPx + 'px';
+    if (box.scrollHeight <= box.clientHeight + 1) return;
+    var lo = minPx, hi = maxPx;
+    for (var i = 0; i < 10; i++) {
+      var mid = (lo + hi) / 2;
+      box.style.fontSize = mid + 'px';
+      if (box.scrollHeight <= box.clientHeight + 1) lo = mid; else hi = mid;
+    }
+    box.style.fontSize = lo + 'px';
+  }
+  function fitAll(){
+    var w = window.innerWidth;
+    fitBox(poolEl, Math.min(34, Math.max(14, w * 0.02)), 9);
+    var zoneMax = Math.min(22, Math.max(12, w * 0.075 / Math.max(state.clubs.length, 1)));
+    state.clubs.forEach(function(z){ if (zoneEls[z.id]) fitBox(zoneEls[z.id].list, zoneMax, 8); });
+  }
+
+  // ---- Lunch question bubble ----
+  function closeAsk(name){
+    if (asks[name]) { asks[name].remove(); delete asks[name]; }
+  }
+  function closeAllAsks(){ Object.keys(asks).forEach(closeAsk); }
+
+  function openAsk(name, x, y){
+    if (!state.askLunch) return;
+    closeAsk(name);
+    var box = document.createElement('div');
+    box.className = 'ask';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'Lunch choice for ' + name);
+
+    var nm = document.createElement('div'); nm.className = 'ask-name'; nm.textContent = name;
+    var q = document.createElement('div'); q.className = 'ask-q'; q.textContent = 'What’s for lunch today?';
+    var btns = document.createElement('div'); btns.className = 'ask-btns';
+    ['hot','cold'].forEach(function(k){
+      var o = state.lunchOpts[k];
+      var b = document.createElement('button');
+      b.className = 'lb' + (state.lunch[name] === k ? ' picked' : '');
+      b.style.background = o.color;
+      b.style.color = textOn(o.color);
+      if (o.icon) {
+        var e = document.createElement('span'); e.className = 'e'; e.setAttribute('aria-hidden','true'); e.textContent = o.icon;
+        b.appendChild(e);
+      }
+      var t = document.createElement('span'); t.textContent = o.label; b.appendChild(t);
+      b.addEventListener('click', function(){
+        state.lunch[name] = k;
+        save();
+        closeAsk(name);
+        render();
+      });
+      btns.appendChild(b);
+    });
+    var xb = document.createElement('button');
+    xb.className = 'ask-x'; xb.setAttribute('aria-label', 'Close'); xb.textContent = '×';
+    xb.addEventListener('click', function(){ closeAsk(name); });
+
+    box.appendChild(nm); box.appendChild(q); box.appendChild(btns); box.appendChild(xb);
+    document.body.appendChild(box);
+    asks[name] = box;
+
+    var r = box.getBoundingClientRect();
+    var left = Math.min(Math.max(8, x - r.width / 2), window.innerWidth - r.width - 8);
+    var top = y - r.height - 24;
+    if (top < 8) top = Math.min(y + 24, window.innerHeight - r.height - 8);
+    box.style.left = left + 'px';
+    box.style.top = Math.max(8, top) + 'px';
+  }
+
+  // ---- Dragging & tapping (pointer events: touch, pen, mouse, several kids at once) ----
+  function targetAt(x, y){
+    var els = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+    for (var i = 0; i < els.length; i++) {
+      if (!els[i]) continue;
+      var t = els[i].closest('[data-drop]');
+      if (t) return t;
+    }
+    return null;
+  }
+
+  function moveGhost(d, x, y){
+    d.ghost.style.transform = 'translate(' + (x - d.dx) + 'px,' + (y - d.dy) + 'px) rotate(-3deg) scale(1.06)';
+    var t = targetAt(x, y);
+    if (t !== d.over) {
+      if (d.over) d.over.classList.remove('over');
+      d.over = t;
+      if (t) t.classList.add('over');
+    }
+  }
+
+  function onDown(e){
+    if (e.button > 0) return;
+    var el = e.currentTarget;
+    var name = el.dataset.name;
+    if (isDragging(name)) return;
+    e.preventDefault();
+    var cs = getComputedStyle(el);
+    pending.set(e.pointerId, {
+      name:name, el:el, x:e.clientX, y:e.clientY, r:el.getBoundingClientRect(),
+      style:{fontSize:cs.fontSize, padding:cs.padding, borderWidth:cs.borderWidth, borderRadius:cs.borderRadius}
+    });
+  }
+
+  function startDrag(id, p, x, y){
+    pending.delete(id);
+    closeAsk(p.name);
+    var ghost = p.el.cloneNode(true);
+    ghost.classList.remove('lifting');
+    ghost.classList.add('ghost');
+    ghost.style.width = p.r.width + 'px';
+    ghost.style.height = p.r.height + 'px';
+    ghost.style.fontSize = p.style.fontSize;
+    ghost.style.padding = p.style.padding;
+    ghost.style.borderWidth = p.style.borderWidth;
+    ghost.style.borderRadius = p.style.borderRadius;
+    document.body.appendChild(ghost);
+    var d = {name:p.name, ghost:ghost, dx:p.x - p.r.left, dy:p.y - p.r.top, over:null};
+    drags.set(id, d);
+    p.el.classList.add('lifting');
+    moveGhost(d, x, y);
+  }
+
+  window.addEventListener('pointermove', function(e){
+    var p = pending.get(e.pointerId);
+    if (p) {
+      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > TAP_DISTANCE) startDrag(e.pointerId, p, e.clientX, e.clientY);
+      return;
+    }
+    var d = drags.get(e.pointerId);
+    if (!d) return;
+    e.preventDefault();
+    moveGhost(d, e.clientX, e.clientY);
+  }, {passive:false});
+
+  function finish(e, cancelled){
+    var p = pending.get(e.pointerId);
+    if (p) {
+      pending.delete(e.pointerId);
+      if (!cancelled) openAsk(p.name, e.clientX, e.clientY);
+      return;
+    }
+    var d = drags.get(e.pointerId);
+    if (!d) return;
+    drags.delete(e.pointerId);
+    d.ghost.remove();
+    if (d.over) d.over.classList.remove('over');
+    var t = cancelled ? null : targetAt(e.clientX, e.clientY);
+    var askLunch = false;
+    if (t) {
+      var zone = t.dataset.drop;
+      if (zone === 'pool') {
+        delete state.places[d.name];
+      } else if (zoneEls[zone]) {
+        state.places[d.name] = zone;
+        var zr = zoneEls[zone].root;
+        zr.classList.remove('landed');
+        void zr.offsetWidth;
+        zr.classList.add('landed');
+        askLunch = !state.lunch[d.name];
+      }
+      save();
+    }
+    render();
+    if (askLunch) openAsk(d.name, e.clientX, e.clientY);
+  }
+  window.addEventListener('pointerup', function(e){ finish(e, false); });
+  window.addEventListener('pointercancel', function(e){ finish(e, true); });
+  window.addEventListener('blur', function(){
+    pending.clear();
+    drags.forEach(function(d){ d.ghost.remove(); if (d.over) d.over.classList.remove('over'); });
+    drags.clear();
+    render();
+  });
+
+  // ---- New day check ----
+  function clearDay(){
+    state.places = {};
+    state.lunch = {};
+    closeAllAsks();
+  }
+  function checkDay(){
+    var t = todayKey();
+    if (state.day !== t) {
+      state.day = t;
+      if (state.fresh) clearDay();
+      save();
+      if (!drags.size) render();
+    }
+  }
+  setInterval(checkDay, 60000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) checkDay(); });
+
+  // ---- Teacher settings ----
+  var dlg = document.getElementById('settings');
+  var ta = document.getElementById('roster');
+  var freshBox = document.getElementById('fresh');
+  var askBox = document.getElementById('askLunch');
+  var titleInput = document.getElementById('titleInput');
+  var lunchListEl = document.getElementById('lunchList');
+  var lunchSummary = document.getElementById('lunchSummary');
+  var clubEditor = document.getElementById('clubEditor');
+  var lunchEditor = document.getElementById('lunchEditor');
+  var addClubBtn = document.getElementById('addClub');
+
+  function applyBoard(){ save(); buildZones(); render(); }
+
+  function makeInput(type, value, cls, label){
+    var i = document.createElement('input');
+    i.type = type; i.value = value || '';
+    if (cls) i.className = cls;
+    i.setAttribute('aria-label', label);
+    return i;
+  }
+  function makeMini(text, label, onClick, disabled){
+    var b = document.createElement('button');
+    b.className = 'mini'; b.textContent = text; b.title = label; b.setAttribute('aria-label', label);
+    b.disabled = !!disabled;
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function buildClubEditor(){
+    clubEditor.innerHTML = '';
+    state.clubs.forEach(function(c, i){
+      var row = document.createElement('div');
+      row.className = 'edit-row';
+      var col = makeInput('color', c.color, '', 'Color for ' + c.name);
+      col.addEventListener('input', function(){ c.color = col.value; applyBoard(); });
+      var ic = makeInput('text', c.icon, 'icon-in', 'Icon for ' + c.name);
+      ic.maxLength = 8;
+      ic.addEventListener('input', function(){ c.icon = ic.value.trim(); applyBoard(); });
+      var nm = makeInput('text', c.name, '', 'Name of play club');
+      nm.maxLength = 30;
+      nm.addEventListener('input', function(){ c.name = nm.value; applyBoard(); });
+      var acts = document.createElement('div');
+      acts.className = 'acts';
+      acts.appendChild(makeMini('↑', 'Move left on the board', function(){
+        var t = state.clubs[i - 1]; state.clubs[i - 1] = c; state.clubs[i] = t; buildClubEditor(); applyBoard();
+      }, i === 0));
+      acts.appendChild(makeMini('↓', 'Move right on the board', function(){
+        var t = state.clubs[i + 1]; state.clubs[i + 1] = c; state.clubs[i] = t; buildClubEditor(); applyBoard();
+      }, i === state.clubs.length - 1));
+      acts.appendChild(makeMini('✕', 'Remove ' + c.name, function(){
+        var inIt = state.roster.filter(function(n){ return state.places[n] === c.id; }).length;
+        if (inIt && !window.confirm('Remove ' + (c.name || 'this club') + '? The ' + inIt + ' student(s) in it will move back to the top.')) return;
+        Object.keys(state.places).forEach(function(n){ if (state.places[n] === c.id) delete state.places[n]; });
+        state.clubs.splice(i, 1);
+        buildClubEditor(); applyBoard();
+      }, state.clubs.length <= 1));
+      row.appendChild(col); row.appendChild(ic); row.appendChild(nm); row.appendChild(acts);
+      clubEditor.appendChild(row);
+    });
+    addClubBtn.disabled = state.clubs.length >= MAX_CLUBS;
+  }
+
+  function buildLunchEditor(){
+    lunchEditor.innerHTML = '';
+    ['hot','cold'].forEach(function(k){
+      var o = state.lunchOpts[k];
+      var row = document.createElement('div');
+      row.className = 'edit-row lunch-row';
+      var col = makeInput('color', o.color, '', 'Color for ' + o.label);
+      col.addEventListener('input', function(){ o.color = col.value; save(); render(); });
+      var ic = makeInput('text', o.icon, 'icon-in', 'Icon for ' + o.label);
+      ic.maxLength = 8;
+      ic.addEventListener('input', function(){ o.icon = ic.value.trim(); save(); render(); });
+      var nm = makeInput('text', o.label, '', 'Lunch option name');
+      nm.maxLength = 24;
+      nm.addEventListener('input', function(){ o.label = nm.value.trim() || DEFAULT_LUNCH[k].label; save(); render(); });
+      row.appendChild(col); row.appendChild(ic); row.appendChild(nm);
+      lunchEditor.appendChild(row);
+    });
+    lunchEditor.hidden = !state.askLunch;
+  }
+
+  function renderLunchList(){
+    lunchSummary.hidden = !state.askLunch;
+    var groups = {hot:[], cold:[], none:[]};
+    state.roster.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(n){
+      (groups[state.lunch[n]] || groups.none).push(n);
+    });
+    lunchListEl.innerHTML = '';
+    [['hot', state.lunchOpts.hot], ['cold', state.lunchOpts.cold], ['none', {label:'Not picked', icon:''}]].forEach(function(g){
+      var row = document.createElement('div');
+      var b = document.createElement('b');
+      b.textContent = (g[1].icon ? g[1].icon + ' ' : '') + g[1].label + ' (' + groups[g[0]].length + ')';
+      row.appendChild(b);
+      row.appendChild(document.createTextNode(' ' + (groups[g[0]].join(', ') || '—')));
+      lunchListEl.appendChild(row);
+    });
+  }
+
+  function openSettings(){
+    ta.value = state.roster.join('\n');
+    freshBox.checked = state.fresh;
+    askBox.checked = state.askLunch;
+    titleInput.value = state.title;
+    renderLunchList();
+    buildClubEditor();
+    buildLunchEditor();
+    dlg.showModal();
+    dlg.scrollTop = 0;
+  }
+  document.getElementById('gear').addEventListener('click', openSettings);
+  hintEl.addEventListener('click', openSettings);
+  document.getElementById('closeSettings').addEventListener('click', function(){ dlg.close(); });
+
+  addClubBtn.addEventListener('click', function(){
+    if (state.clubs.length >= MAX_CLUBS) return;
+    var palette = ['#2BAE66','#D94F70','#5B6CE0','#E8A33D','#3FA7B5','#9B59B6'];
+    state.clubs.push({id:'c' + Date.now().toString(36), name:'New club', icon:'⭐', color:palette[state.clubs.length % palette.length]});
+    buildClubEditor(); applyBoard();
+    var inputs = clubEditor.querySelectorAll('input[type=text]:not(.icon-in)');
+    if (inputs.length) { inputs[inputs.length - 1].focus(); inputs[inputs.length - 1].select(); }
+  });
+
+  document.getElementById('resetClubs').addEventListener('click', function(){
+    if (!window.confirm('Put the play clubs back to the original six? Students in clubs that are removed will move back to the top.')) return;
+    state.clubs = clone(DEFAULT_CLUBS);
+    buildClubEditor(); applyBoard();
+  });
+
+  askBox.addEventListener('change', function(){
+    state.askLunch = askBox.checked;
+    if (!state.askLunch) closeAllAsks();
+    lunchEditor.hidden = !state.askLunch;
+    renderLunchList();
+    save(); render();
+  });
+
+  titleInput.addEventListener('input', function(){ state.title = titleInput.value.trim() || 'Play Club'; save(); render(); });
+
+  document.getElementById('sortAZ').addEventListener('click', function(){
+    ta.value = ta.value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean)
+                 .sort(function(a,b){ return a.localeCompare(b); }).join('\n');
+  });
+
+  document.getElementById('saveRoster').addEventListener('click', function(){
+    var seen = {};
+    var names = ta.value.split('\n').map(function(s){ return s.trim(); })
+                  .filter(function(s){ if (!s || seen[s]) return false; seen[s] = true; return true; });
+    var keepPlaces = {}, keepLunch = {};
+    names.forEach(function(n){
+      if (state.places[n]) keepPlaces[n] = state.places[n];
+      if (state.lunch[n]) keepLunch[n] = state.lunch[n];
+    });
+    Object.keys(asks).forEach(function(n){ if (!seen[n]) closeAsk(n); });
+    state.roster = names;
+    state.places = keepPlaces;
+    state.lunch = keepLunch;
+    state.isSample = false;
+    save(); render();
+    renderLunchList();
+  });
+
+  freshBox.addEventListener('change', function(){ state.fresh = freshBox.checked; save(); });
+
+  document.getElementById('resetAll').addEventListener('click', function(){
+    clearDay();
+    save(); render(); renderLunchList();
+  });
+
+  var fitQueued = false;
+  window.addEventListener('resize', function(){
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(function(){ fitQueued = false; fitAll(); });
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);
+
+  buildZones();
+  checkDay();
+  render();
+})();
+</script>
+</body>
+</html>
