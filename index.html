@@ -45,6 +45,32 @@ h1{margin:0;font-size:clamp(1.8rem,3.6vw,3.4rem);font-weight:800;letter-spacing:
   border-radius:999px;padding:.4em 1em;border:2px solid var(--line);white-space:nowrap}
 .gear{font-size:clamp(1.1rem,1.8vw,1.7rem);background:transparent;border:2px solid var(--line);color:var(--ink);
   border-radius:12px;width:2.4em;height:2.4em;cursor:pointer;flex:none}
+.lockpill{width:auto;height:auto;font:inherit;font-weight:700;font-size:clamp(1rem,1.5vw,1.4rem);padding:.55em .9em;white-space:nowrap}
+.unlock{position:relative;opacity:.5}
+.unlock svg{position:absolute;left:-5px;top:-5px;width:calc(100% + 10px);height:calc(100% + 10px);pointer-events:none;transform:rotate(-90deg)}
+.unlock circle{fill:none;stroke:var(--ink);stroke-width:4;stroke-dasharray:151;stroke-dashoffset:151;transition:none}
+.unlock.holding{opacity:1}
+.unlock.holding circle{stroke-dashoffset:0;transition:stroke-dashoffset 3s linear}
+body.locked .teacher-only{display:none !important}
+body:not(.locked) .unlock{display:none}
+body.locked{touch-action:none}
+html,body{overscroll-behavior:none}
+.absent-line{font-size:clamp(.85rem,1.2vw,1.2rem);font-weight:600;color:var(--muted)}
+.fs-return{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:95;
+  font:inherit;font-weight:800;font-size:clamp(1rem,1.6vw,1.5rem);background:var(--ink);color:var(--surface);border:none;
+  border-radius:999px;padding:.8em 1.6em;cursor:pointer;box-shadow:0 10px 24px rgba(15,25,45,.35)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:96;
+  max-width:min(640px,92vw);background:var(--ink);color:var(--surface);border-radius:16px;padding:.8em 1.2em;
+  font-weight:600;font-size:clamp(.95rem,1.3vw,1.2rem);text-align:center;box-shadow:0 10px 24px rgba(15,25,45,.35)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-weight:600;font-size:.95rem;padding:.45em .9em;border-radius:999px;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.chip[aria-pressed="true"]::before{content:"✕ "}
+input[type=date]{font:inherit;font-size:1rem;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:.5em .7em}
+.upcoming{display:flex;flex-direction:column;gap:6px}
+.upcoming button{font:inherit;text-align:left;background:var(--bg);color:var(--ink);border:none;border-radius:10px;padding:.55em .8em;cursor:pointer;line-height:1.4}
+.upcoming b{margin-right:.4em}
 
 main{flex:1;min-height:0;display:flex;flex-direction:column;gap:1.4vh;padding:.8vh 2vw 1.8vh}
 
@@ -169,19 +195,24 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     <div class="pill" id="hotCount"></div>
     <div class="pill" id="coldCount"></div>
   </div>
-  <button class="gear" id="gear" aria-label="Teacher settings" title="Teacher settings">⚙️</button>
+  <button class="gear lockpill teacher-only" id="lockBtn" title="Go full screen and lock the board for students">🔒 Lock</button>
+  <button class="gear teacher-only" id="gear" aria-label="Teacher settings" title="Teacher settings">⚙️</button>
+  <button class="gear unlock" id="unlockBtn" aria-label="Teacher: press and hold to unlock" title="Teacher: press and hold to unlock">🔒<svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/></svg></button>
 </header>
 
 <main>
   <section class="pool" data-drop="pool" aria-label="Names not sorted yet">
     <div class="pool-head">
       <h2 id="prompt"></h2>
-      <button class="hint" id="hint" hidden>These are sample names. Add your class ⚙️</button>
+      <span class="absent-line" id="absentLine" hidden></span>
+      <button class="hint teacher-only" id="hint" hidden>These are sample names. Add your class ⚙️</button>
     </div>
     <div class="tags" id="pool"></div>
   </section>
   <section class="zones" id="zones" aria-label="Play clubs"></section>
 </main>
+<button class="fs-return" id="fsReturn" hidden>Tap here to go back to full screen</button>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <dialog id="settings" aria-labelledby="settingsTitle">
   <div class="sheet-top">
@@ -189,6 +220,18 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     <button class="btn primary" id="closeSettings">Done</button>
   </div>
   <div class="sheet">
+    <section>
+      <h4>Absences</h4>
+      <p>Pick a day, then tap names to mark them absent. Absent students won’t show on the board that day, and you can mark absences ahead of time.</p>
+      <div class="row">
+        <input type="date" id="absDate" aria-label="Day to mark absences">
+        <button class="btn quiet" id="absToday">Today</button>
+        <button class="btn quiet" id="absNext">Next school day</button>
+      </div>
+      <div class="chips" id="absChips"></div>
+      <div class="upcoming" id="absUpcoming" hidden></div>
+    </section>
+
     <section id="lunchSummary">
       <h4>Today’s lunch</h4>
       <div class="lunch-list" id="lunchList"></div>
@@ -265,7 +308,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
   // ---- Load saved state ----
   var state = {
     roster:SAMPLE.slice(), places:{}, lunch:{}, day:todayKey(), fresh:true, isSample:true,
-    clubs:clone(DEFAULT_CLUBS), lunchOpts:clone(DEFAULT_LUNCH), askLunch:true, title:'Play Club'
+    clubs:clone(DEFAULT_CLUBS), lunchOpts:clone(DEFAULT_LUNCH), askLunch:true, title:'Play Club', absent:{}
   };
   try {
     var raw = localStorage.getItem(KEY);
@@ -285,11 +328,23 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
         if (s.lunchOpts && s.lunchOpts.hot && s.lunchOpts.cold) state.lunchOpts = s.lunchOpts;
         if (typeof s.askLunch === 'boolean') state.askLunch = s.askLunch;
         if (typeof s.title === 'string') state.title = s.title;
+        if (s.absent && typeof s.absent === 'object') state.absent = s.absent;
       }
     }
   } catch (e) {}
 
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  // ---- Absences (stored by date so they can be set ahead of time) ----
+  function pruneAbsent(){
+    var t = todayKey();
+    Object.keys(state.absent).forEach(function(k){
+      if (k < t || !Array.isArray(state.absent[k]) || !state.absent[k].length) delete state.absent[k];
+    });
+  }
+  function absentOn(day){ return state.absent[day] || []; }
+  function isAbsentToday(n){ return absentOn(todayKey()).indexOf(n) !== -1; }
+  pruneAbsent();
 
   // ---- Color helpers ----
   function rgb(hex){
@@ -319,6 +374,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
   var hintEl = document.getElementById('hint');
   var titleEl = document.getElementById('boardTitle');
   var promptEl = document.getElementById('prompt');
+  var absentLine = document.getElementById('absentLine');
   var drags = new Map();
   var pending = new Map();
   var asks = {};
@@ -400,20 +456,25 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
       ? 'Drag your name to your play club, then pick your lunch'
       : 'Drag your name to where you’re playing today';
     hintEl.hidden = !state.isSample;
+    var away = state.roster.filter(isAbsentToday);
+    var present = state.roster.filter(function(n){ return !isAbsentToday(n); });
+    absentLine.hidden = !away.length;
+    absentLine.textContent = 'Absent today: ' + away.join(', ');
 
     poolEl.innerHTML = '';
-    var waiting = state.roster.filter(function(n){ return !clubById(state.places[n]); });
+    var waiting = present.filter(function(n){ return !clubById(state.places[n]); });
     waiting.forEach(function(n){ poolEl.appendChild(makeTag(n, false)); });
     if (!waiting.length) {
       var d = document.createElement('div');
       d.className = 'done';
-      d.textContent = state.roster.length ? 'Everyone’s picked a play club! 🎉' : 'Add your class list in ⚙️ settings';
+      d.textContent = present.length ? 'Everyone’s picked a play club! 🎉'
+        : (state.roster.length ? 'Everyone is absent today' : 'Add your class list in ⚙️ settings');
       poolEl.appendChild(d);
     }
 
     var picked = 0;
     state.clubs.forEach(function(z){
-      var names = state.roster.filter(function(n){ return state.places[n] === z.id; })
+      var names = present.filter(function(n){ return state.places[n] === z.id; })
                               .sort(function(a,b){ return a.localeCompare(b); });
       picked += names.length;
       var zl = zoneEls[z.id];
@@ -422,9 +483,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
       zl.count.textContent = names.length;
     });
 
-    progressEl.textContent = picked + ' of ' + state.roster.length + ' picked';
+    progressEl.textContent = picked + ' of ' + present.length + ' picked';
     var counts = {hot:0, cold:0};
-    state.roster.forEach(function(n){ if (counts[state.lunch[n]] !== undefined) counts[state.lunch[n]]++; });
+    present.forEach(function(n){ if (counts[state.lunch[n]] !== undefined) counts[state.lunch[n]]++; });
     [['hot', hotEl], ['cold', coldEl]].forEach(function(p){
       var o = state.lunchOpts[p[0]];
       p[1].hidden = !state.askLunch;
@@ -620,6 +681,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     var t = todayKey();
     if (state.day !== t) {
       state.day = t;
+      pruneAbsent();
       if (state.fresh) clearDay();
       save();
       if (!drags.size) render();
@@ -713,12 +775,13 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
 
   function renderLunchList(){
     lunchSummary.hidden = !state.askLunch;
-    var groups = {hot:[], cold:[], none:[]};
+    var groups = {hot:[], cold:[], none:[], away:[]};
     state.roster.slice().sort(function(a,b){ return a.localeCompare(b); }).forEach(function(n){
-      (groups[state.lunch[n]] || groups.none).push(n);
+      if (isAbsentToday(n)) groups.away.push(n);
+      else (groups[state.lunch[n]] || groups.none).push(n);
     });
     lunchListEl.innerHTML = '';
-    [['hot', state.lunchOpts.hot], ['cold', state.lunchOpts.cold], ['none', {label:'Not picked', icon:''}]].forEach(function(g){
+    [['hot', state.lunchOpts.hot], ['cold', state.lunchOpts.cold], ['none', {label:'Not picked', icon:''}], ['away', {label:'Absent', icon:''}]].forEach(function(g){
       var row = document.createElement('div');
       var b = document.createElement('b');
       b.textContent = (g[1].icon ? g[1].icon + ' ' : '') + g[1].label + ' (' + groups[g[0]].length + ')';
@@ -733,6 +796,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     freshBox.checked = state.fresh;
     askBox.checked = state.askLunch;
     titleInput.value = state.title;
+    absDate.value = todayKey();
+    buildAbsences();
     renderLunchList();
     buildClubEditor();
     buildLunchEditor();
@@ -789,6 +854,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     state.isSample = false;
     save(); render();
     renderLunchList();
+    buildAbsences();
   });
 
   freshBox.addEventListener('change', function(){ state.fresh = freshBox.checked; save(); });
@@ -797,6 +863,137 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px soli
     clearDay();
     save(); render(); renderLunchList();
   });
+
+  // ---- Absence settings ----
+  var absDate = document.getElementById('absDate');
+  var absChips = document.getElementById('absChips');
+  var absUpcoming = document.getElementById('absUpcoming');
+
+  function keyFromDate(d){
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function dateFromKey(k){ var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function nextSchoolDay(){
+    var d = new Date();
+    do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+    return keyFromDate(d);
+  }
+  function dayLabel(k){
+    if (k === todayKey()) return 'Today';
+    return dateFromKey(k).toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+  }
+
+  function buildAbsences(){
+    absDate.min = todayKey();
+    if (!absDate.value || absDate.value < todayKey()) absDate.value = todayKey();
+    var day = absDate.value;
+    var marked = absentOn(day);
+    absChips.innerHTML = '';
+    if (!state.roster.length) absChips.textContent = 'Add your class list first.';
+    state.roster.forEach(function(n){
+      var b = document.createElement('button');
+      b.className = 'chip';
+      b.textContent = n;
+      b.setAttribute('aria-pressed', marked.indexOf(n) !== -1 ? 'true' : 'false');
+      b.addEventListener('click', function(){
+        var cur = absentOn(day).slice();
+        var i = cur.indexOf(n);
+        if (i === -1) { cur.push(n); if (day === todayKey()) closeAsk(n); }
+        else cur.splice(i, 1);
+        if (cur.length) state.absent[day] = cur; else delete state.absent[day];
+        save(); render(); renderLunchList(); buildAbsences();
+      });
+      absChips.appendChild(b);
+    });
+    absUpcoming.innerHTML = '';
+    Object.keys(state.absent).sort().forEach(function(k){
+      var names = absentOn(k).filter(function(n){ return state.roster.indexOf(n) !== -1; });
+      if (!names.length) return;
+      var r = document.createElement('button');
+      var b = document.createElement('b');
+      b.textContent = dayLabel(k) + ':';
+      r.appendChild(b);
+      r.appendChild(document.createTextNode(names.join(', ')));
+      r.title = 'Edit absences for ' + dayLabel(k);
+      r.addEventListener('click', function(){ absDate.value = k; buildAbsences(); });
+      absUpcoming.appendChild(r);
+    });
+    absUpcoming.hidden = !absUpcoming.children.length;
+  }
+  absDate.addEventListener('change', buildAbsences);
+  document.getElementById('absToday').addEventListener('click', function(){ absDate.value = todayKey(); buildAbsences(); });
+  document.getElementById('absNext').addEventListener('click', function(){ absDate.value = nextSchoolDay(); buildAbsences(); });
+
+  // ---- Lock mode: full screen, hidden teacher controls, press-and-hold to unlock ----
+  var lockBtn = document.getElementById('lockBtn');
+  var unlockBtn = document.getElementById('unlockBtn');
+  var fsReturn = document.getElementById('fsReturn');
+  var toastEl = document.getElementById('toast');
+  var locked = false, fsWorked = false, toastTimer = null, holdTimer = null;
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.hidden = true; }, 7000);
+  }
+  function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement || null; }
+  function enterFs(){
+    var el = document.documentElement;
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!fn) return Promise.reject(new Error('unsupported'));
+    try {
+      var p = fn.call(el);
+      if (p && typeof p.then === 'function') return p;
+      return new Promise(function(res, rej){ setTimeout(function(){ fsEl() ? res() : rej(new Error('blocked')); }, 300); });
+    } catch (e) { return Promise.reject(e); }
+  }
+  function exitFs(){
+    if (!fsEl()) return;
+    var fn = document.exitFullscreen || document.webkitExitFullscreen;
+    try { var p = fn && fn.call(document); if (p && p.catch) p.catch(function(){}); } catch (e) {}
+  }
+  function updateFs(){ fsReturn.hidden = !(locked && fsWorked && !fsEl()); }
+
+  function lockBoard(){
+    locked = true;
+    document.body.classList.add('locked');
+    if (dlg.open) dlg.close();
+    enterFs().then(function(){ fsWorked = true; updateFs(); })
+      .catch(function(){
+        fsWorked = false; updateFs();
+        toast('Board locked. This page can’t go full screen on its own here, so press F11 to hide the browser tabs.');
+      });
+  }
+  function unlockBoard(){
+    locked = false;
+    document.body.classList.remove('locked');
+    fsReturn.hidden = true;
+    exitFs();
+  }
+
+  lockBtn.addEventListener('click', lockBoard);
+  fsReturn.addEventListener('click', function(){ enterFs().then(updateFs, updateFs); });
+  document.addEventListener('fullscreenchange', updateFs);
+  document.addEventListener('webkitfullscreenchange', updateFs);
+
+  function cancelHold(){ clearTimeout(holdTimer); holdTimer = null; unlockBtn.classList.remove('holding'); }
+  unlockBtn.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    cancelHold();
+    void unlockBtn.offsetWidth;
+    unlockBtn.classList.add('holding');
+    holdTimer = setTimeout(function(){ cancelHold(); unlockBoard(); }, 3000);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function(t){ unlockBtn.addEventListener(t, cancelHold); });
+
+  // Ask before the tab closes or reloads while locked
+  window.addEventListener('beforeunload', function(e){
+    if (locked) { e.preventDefault(); e.returnValue = ''; }
+  });
+  // No right-click / long-press menu on the board, and no ctrl-zoom while locked
+  document.addEventListener('contextmenu', function(e){ if (!dlg.open) e.preventDefault(); });
+  window.addEventListener('wheel', function(e){ if (locked && e.ctrlKey) e.preventDefault(); }, {passive:false});
 
   var fitQueued = false;
   window.addEventListener('resize', function(){
